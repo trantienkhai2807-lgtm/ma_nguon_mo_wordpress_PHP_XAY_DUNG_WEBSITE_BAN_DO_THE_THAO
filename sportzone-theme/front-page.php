@@ -38,15 +38,15 @@ get_header();
         <div class="category-grid">
             <?php
             $categories = [
-                ['Chạy bộ', 'Giày, áo khoác, túi nước', 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=900&q=80', 'running'],
-                ['Tập luyện', 'Găng tay, dây kháng lực, quần áo', 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=900&q=80', 'training'],
-                ['Bóng đá', 'Bóng, giày sân cỏ, bảo vệ ống đồng', 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=900&q=80', 'football'],
-                ['Tennis', 'Vợt, bóng, túi đựng vợt', 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=900&q=80', 'tennis'],
+                ['Quần áo thể thao', 'Áo tập, áo polo, quần short', sportzone_image_url('quanao-thethao/aococtaynma.jpg'), 'quan-ao-the-thao'],
+                ['Giày thể thao', 'Giày nam, giày nữ, giày tập luyện', sportzone_image_url('giay-thethao/giaythethao9.jpg'), 'giay-the-thao'],
+                ['Dụng cụ thể thao', 'Bóng, tạ, dây tập và thiết bị', sportzone_image_url('dungcu-thethao/dungcu2.jpg'), 'dung-cu-the-thao'],
+                ['Phụ kiện thể thao', 'Túi, bảo hộ và phụ kiện tập', sportzone_image_url('phukien-thethao/phukien3.jpg'), 'phu-kien-the-thao'],
             ];
 
             foreach ($categories as $category) :
                 ?>
-                <a class="category-tile" href="<?php echo esc_url(home_url('/product-category/' . $category[3])); ?>">
+                <a class="category-tile" href="<?php echo esc_url(sportzone_product_category_url($category[3])); ?>">
                     <img src="<?php echo esc_url($category[2]); ?>" alt="<?php echo esc_attr($category[0]); ?>">
                     <div class="category-tile__body">
                         <h3><?php echo esc_html($category[0]); ?></h3>

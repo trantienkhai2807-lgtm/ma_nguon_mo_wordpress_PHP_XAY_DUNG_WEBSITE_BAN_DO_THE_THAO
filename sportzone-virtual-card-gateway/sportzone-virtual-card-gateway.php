@@ -86,8 +86,25 @@ function sportzone_virtual_card_init(): void
             if ($this->description) {
                 echo wpautop(wp_kses_post($this->description));
             }
+            $saved_card = is_user_logged_in() ? get_user_meta(get_current_user_id(), 'sportzone_demo_card', true) : [];
+            $saved_card = is_array($saved_card) ? $saved_card : [];
             ?>
             <fieldset class="sportzone-card-fields">
+                <?php if (!empty($saved_card['last4'])) : ?>
+                    <div class="sportzone-checkout-saved-card">
+                        <label>
+                            <input type="radio" name="sportzone_use_saved_card" value="1" checked>
+                            <?php
+                            printf(
+                                esc_html__('Dùng thẻ đã lưu: •••• %1$s - %2$s', 'sportzone-card'),
+                                esc_html($saved_card['last4']),
+                                esc_html($saved_card['expiry'] ?? '')
+                            );
+                            ?>
+                        </label>
+                    </div>
+                    <p><?php esc_html_e('Hoặc nhập thẻ demo khác bên dưới.', 'sportzone-card'); ?></p>
+                <?php endif; ?>
                 <p class="form-row form-row-wide">
                     <label for="sportzone_card_name"><?php esc_html_e('Tên chủ thẻ', 'sportzone-card'); ?> <span class="required">*</span></label>
                     <input id="sportzone_card_name" name="sportzone_card_name" type="text" autocomplete="cc-name" placeholder="NGUYEN VAN A">
@@ -115,6 +132,17 @@ function sportzone_virtual_card_init(): void
             $number = isset($_POST['sportzone_card_number']) ? preg_replace('/\D+/', '', (string) wp_unslash($_POST['sportzone_card_number'])) : '';
             $expiry = isset($_POST['sportzone_card_expiry']) ? sanitize_text_field(wp_unslash($_POST['sportzone_card_expiry'])) : '';
             $cvv = isset($_POST['sportzone_card_cvv']) ? preg_replace('/\D+/', '', (string) wp_unslash($_POST['sportzone_card_cvv'])) : '';
+            $saved_card = is_user_logged_in() ? get_user_meta(get_current_user_id(), 'sportzone_demo_card', true) : [];
+            $saved_card = is_array($saved_card) ? $saved_card : [];
+
+            if ($name === '' && $number === '' && $expiry === '' && $cvv === '' && !empty($saved_card['last4'])) {
+                if (($saved_card['last4'] ?? '') === substr($this->test_card, -4) && $this->expiry_is_valid((string) ($saved_card['expiry'] ?? ''))) {
+                    return true;
+                }
+
+                wc_add_notice(__('Thẻ đã lưu không hợp lệ hoặc đã hết hạn. Vui lòng cập nhật thẻ trong tài khoản.', 'sportzone-card'), 'error');
+                return false;
+            }
 
             if ($name === '' || $number === '' || $expiry === '' || $cvv === '') {
                 wc_add_notice(__('Vui lòng nhập đầy đủ thông tin thẻ ảo.', 'sportzone-card'), 'error');

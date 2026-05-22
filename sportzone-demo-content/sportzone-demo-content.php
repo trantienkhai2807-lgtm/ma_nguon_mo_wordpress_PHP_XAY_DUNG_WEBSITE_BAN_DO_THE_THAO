@@ -15,6 +15,12 @@ if (!defined('ABSPATH')) {
 
 register_activation_hook(__FILE__, 'sportzone_demo_activate');
 
+add_filter('image_downsize', 'sportzone_demo_image_downsize', 10, 3);
+add_filter('wp_get_attachment_url', 'sportzone_demo_attachment_url', 10, 2);
+add_action('init', 'sportzone_demo_handle_account_forms');
+add_shortcode('sportzone_login_form', 'sportzone_demo_login_form_shortcode');
+add_shortcode('sportzone_register_form', 'sportzone_demo_register_form_shortcode');
+
 function sportzone_demo_activate(): void
 {
     sportzone_demo_create_pages();
@@ -34,8 +40,224 @@ function sportzone_demo_activate(): void
     update_option('sportzone_demo_content_created', current_time('mysql'));
 }
 
+function sportzone_demo_attachment_url(string $url, int $attachment_id): string
+{
+    $source_url = (string) get_post_meta($attachment_id, '_sportzone_source_image', true);
+
+    return $source_url ?: $url;
+}
+
+function sportzone_demo_image_downsize($downsize, int $attachment_id, $size)
+{
+    $source_url = (string) get_post_meta($attachment_id, '_sportzone_source_image', true);
+
+    if (!$source_url) {
+        return $downsize;
+    }
+
+    [$width, $height] = sportzone_demo_source_image_dimensions($source_url);
+
+    return [$source_url, $width, $height, false];
+}
+
+function sportzone_demo_source_image_dimensions(string $source_url): array
+{
+    $content_url = content_url('images/');
+    $relative_path = str_starts_with($source_url, $content_url) ? substr($source_url, strlen($content_url)) : '';
+    $file_path = $relative_path ? wp_normalize_path(WP_CONTENT_DIR . '/images/' . ltrim($relative_path, '/')) : '';
+
+    if ($file_path && file_exists($file_path)) {
+        $dimensions = @getimagesize($file_path);
+
+        if ($dimensions) {
+            return [(int) $dimensions[0], (int) $dimensions[1]];
+        }
+    }
+
+    return [900, 900];
+}
+
+function sportzone_demo_handle_account_forms(): void
+{
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        return;
+    }
+
+    if (isset($_POST['sportzone_login_action'])) {
+        sportzone_demo_handle_login();
+    }
+
+    if (isset($_POST['sportzone_register_action'])) {
+        sportzone_demo_handle_register();
+    }
+}
+
+function sportzone_demo_handle_login(): void
+{
+    if (!isset($_POST['sportzone_login_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['sportzone_login_nonce'])), 'sportzone_login')) {
+        wp_safe_redirect(add_query_arg('login_error', 'nonce', sportzone_demo_login_url()));
+        exit;
+    }
+
+    $credentials = [
+        'user_login'    => isset($_POST['username']) ? sanitize_user(wp_unslash($_POST['username'])) : '',
+        'user_password' => isset($_POST['password']) ? (string) wp_unslash($_POST['password']) : '',
+        'remember'      => !empty($_POST['rememberme']),
+    ];
+
+    $user = wp_signon($credentials, is_ssl());
+
+    if (is_wp_error($user)) {
+        wp_safe_redirect(add_query_arg('login_error', 'invalid', sportzone_demo_login_url()));
+        exit;
+    }
+
+    wp_safe_redirect(class_exists('WooCommerce') ? wc_get_page_permalink('myaccount') : home_url('/'));
+    exit;
+}
+
+function sportzone_demo_handle_register(): void
+{
+    if (!isset($_POST['sportzone_register_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['sportzone_register_nonce'])), 'sportzone_register')) {
+        wp_safe_redirect(add_query_arg('register_error', 'nonce', sportzone_demo_register_url()));
+        exit;
+    }
+
+    $username = isset($_POST['username']) ? sanitize_user(wp_unslash($_POST['username'])) : '';
+    $email = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
+    $password = isset($_POST['password']) ? (string) wp_unslash($_POST['password']) : '';
+
+    if (!$username || !$email || !$password) {
+        wp_safe_redirect(add_query_arg('register_error', 'missing', sportzone_demo_register_url()));
+        exit;
+    }
+
+    if (username_exists($username)) {
+        wp_safe_redirect(add_query_arg('register_error', 'username_exists', sportzone_demo_register_url()));
+        exit;
+    }
+
+    if (!is_email($email) || email_exists($email)) {
+        wp_safe_redirect(add_query_arg('register_error', 'email_exists', sportzone_demo_register_url()));
+        exit;
+    }
+
+    $user_id = wp_create_user($username, $password, $email);
+
+    if (is_wp_error($user_id)) {
+        wp_safe_redirect(add_query_arg('register_error', 'failed', sportzone_demo_register_url()));
+        exit;
+    }
+
+    $user = new WP_User((int) $user_id);
+    $user->set_role('customer');
+
+    wp_safe_redirect(add_query_arg('registered', '1', sportzone_demo_login_url()));
+    exit;
+}
+
+function sportzone_demo_login_form_shortcode(): string
+{
+    if (is_user_logged_in()) {
+        return '<div class="sportzone-auth"><p>Bạn đã đăng nhập.</p><a class="button" href="' . esc_url(class_exists('WooCommerce') ? wc_get_page_permalink('myaccount') : home_url('/')) . '">Vào tài khoản</a></div>';
+    }
+
+    $message = '';
+
+    if (isset($_GET['registered'])) {
+        $message = '<div class="woocommerce-message">Đăng ký thành công. Hãy đăng nhập bằng tài khoản vừa tạo.</div>';
+    } elseif (isset($_GET['login_error'])) {
+        $message = '<div class="woocommerce-error">Thông tin đăng nhập chưa đúng. Vui lòng kiểm tra lại.</div>';
+    }
+
+    ob_start();
+    ?>
+    <div class="sportzone-auth">
+        <?php echo wp_kses_post($message); ?>
+        <form class="sportzone-auth__form" method="post">
+            <?php wp_nonce_field('sportzone_login', 'sportzone_login_nonce'); ?>
+            <input type="hidden" name="sportzone_login_action" value="1">
+            <p>
+                <label for="sportzone-login-username">Tên đăng nhập</label>
+                <input id="sportzone-login-username" name="username" type="text" autocomplete="username" required>
+            </p>
+            <p>
+                <label for="sportzone-login-password">Mật khẩu</label>
+                <input id="sportzone-login-password" name="password" type="password" autocomplete="current-password" required>
+            </p>
+            <label class="sportzone-auth__check">
+                <input name="rememberme" type="checkbox" value="forever">
+                <span>Ghi nhớ đăng nhập</span>
+            </label>
+            <button class="button" type="submit">Đăng nhập</button>
+        </form>
+        <p class="sportzone-auth__switch">Chưa có tài khoản? <a href="<?php echo esc_url(sportzone_demo_register_url()); ?>">Đăng ký tài khoản</a></p>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+function sportzone_demo_register_form_shortcode(): string
+{
+    if (is_user_logged_in()) {
+        return '<div class="sportzone-auth"><p>Bạn đã đăng nhập.</p><a class="button" href="' . esc_url(class_exists('WooCommerce') ? wc_get_page_permalink('myaccount') : home_url('/')) . '">Vào tài khoản</a></div>';
+    }
+
+    $message = '';
+
+    if (isset($_GET['register_error'])) {
+        $messages = [
+            'missing' => 'Vui lòng nhập đầy đủ thông tin.',
+            'username_exists' => 'Tên đăng nhập đã tồn tại.',
+            'email_exists' => 'Email không hợp lệ hoặc đã được sử dụng.',
+            'failed' => 'Không thể tạo tài khoản. Vui lòng thử lại.',
+            'nonce' => 'Phiên đăng ký đã hết hạn. Vui lòng thử lại.',
+        ];
+        $error_key = sanitize_key(wp_unslash($_GET['register_error']));
+        $message = '<div class="woocommerce-error">' . esc_html($messages[$error_key] ?? $messages['failed']) . '</div>';
+    }
+
+    ob_start();
+    ?>
+    <div class="sportzone-auth">
+        <?php echo wp_kses_post($message); ?>
+        <form class="sportzone-auth__form" method="post">
+            <?php wp_nonce_field('sportzone_register', 'sportzone_register_nonce'); ?>
+            <input type="hidden" name="sportzone_register_action" value="1">
+            <p>
+                <label for="sportzone-register-username">Tên đăng nhập</label>
+                <input id="sportzone-register-username" name="username" type="text" autocomplete="username" required>
+            </p>
+            <p>
+                <label for="sportzone-register-email">Email</label>
+                <input id="sportzone-register-email" name="email" type="email" autocomplete="email" required>
+            </p>
+            <p>
+                <label for="sportzone-register-password">Mật khẩu</label>
+                <input id="sportzone-register-password" name="password" type="password" autocomplete="new-password" required>
+            </p>
+            <button class="button" type="submit">Đăng ký</button>
+        </form>
+        <p class="sportzone-auth__switch">Đã có tài khoản? <a href="<?php echo esc_url(sportzone_demo_login_url()); ?>">Đăng nhập</a></p>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
+function sportzone_demo_login_url(): string
+{
+    return home_url('/dang-nhap');
+}
+
+function sportzone_demo_register_url(): string
+{
+    return home_url('/dang-ky');
+}
+
 function sportzone_demo_ensure_woocommerce_pages(): void
 {
+    sportzone_demo_enable_account_registration();
+
     $pages = [
         'cart' => [
             'title' => 'Giỏ hàng',
@@ -90,6 +312,14 @@ function sportzone_demo_ensure_woocommerce_pages(): void
     }
 }
 
+function sportzone_demo_enable_account_registration(): void
+{
+    update_option('users_can_register', 1);
+    update_option('woocommerce_enable_myaccount_registration', 'no');
+    update_option('woocommerce_registration_generate_username', 'no');
+    update_option('woocommerce_registration_generate_password', 'no');
+}
+
 function sportzone_demo_create_category_pages(): void
 {
     $pages = [
@@ -97,37 +327,37 @@ function sportzone_demo_create_category_pages(): void
             'title'   => 'Quần áo thể thao',
             'slug'    => 'quan-ao-the-thao',
             'summary' => 'Áo tập, áo khoác, quần short và trang phục thể thao thoáng khí cho luyện tập hằng ngày.',
-            'shortcode' => '[products limit="8" columns="4" category="tap-luyen,training"]',
+            'shortcode' => '[products limit="12" columns="4" category="quan-ao-the-thao"]',
         ],
         [
             'title'   => 'Giày thể thao',
             'slug'    => 'giay-the-thao',
             'summary' => 'Giày chạy bộ, giày sân cỏ và giày tập luyện có độ bám tốt, êm chân và dễ phối đồ.',
-            'shortcode' => '[products limit="8" columns="4" category="chay-bo,running,bong-da,football"]',
+            'shortcode' => '[products limit="12" columns="4" category="giay-the-thao"]',
         ],
         [
             'title'   => 'Dụng cụ thể thao',
             'slug'    => 'dung-cu-the-thao',
             'summary' => 'Bóng, dây kháng lực và dụng cụ hỗ trợ cho tập luyện tại nhà, phòng gym hoặc sân thi đấu.',
-            'shortcode' => '[products limit="8" columns="4" category="bong-da,football,tap-luyen,training"]',
+            'shortcode' => '[products limit="12" columns="4" category="dung-cu-the-thao"]',
         ],
         [
             'title'   => 'Phụ kiện thể thao',
             'slug'    => 'phu-kien-the-thao',
             'summary' => 'Túi đựng vợt, phụ kiện tennis, phụ kiện chạy bộ và các món cần thiết khi tập luyện.',
-            'shortcode' => '[products limit="8" columns="4" category="tennis,chay-bo,running"]',
+            'shortcode' => '[products limit="12" columns="4" category="phu-kien-the-thao"]',
         ],
         [
             'title'   => 'Thể thao nam',
             'slug'    => 'nam',
             'summary' => 'Sản phẩm thể thao dành cho nam: giày, áo tập, bóng đá, tennis và phụ kiện.',
-            'shortcode' => '[products limit="8" columns="4"]',
+            'shortcode' => '[products limit="12" columns="4" category="nam"]',
         ],
         [
             'title'   => 'Thể thao nữ',
             'slug'    => 'nu',
             'summary' => 'Sản phẩm thể thao dành cho nữ: giày chạy bộ, áo tập, phụ kiện và trang phục năng động.',
-            'shortcode' => '[products limit="8" columns="4"]',
+            'shortcode' => '[products limit="12" columns="4" category="nu"]',
         ],
         [
             'title'   => 'Thể thao trẻ em',
@@ -223,6 +453,16 @@ function sportzone_demo_create_pages(): void
             'content' => '<h2>Liên hệ SportZone</h2><p>Hotline: 1900 6868</p><p>Email: support@sportzone.local</p><p>Địa chỉ: 123 Nguyễn Trãi, Quận 1, TP.HCM</p>',
         ],
         [
+            'title'   => 'Đăng nhập',
+            'slug'    => 'dang-nhap',
+            'content' => '[sportzone_login_form]',
+        ],
+        [
+            'title'   => 'Đăng ký',
+            'slug'    => 'dang-ky',
+            'content' => '[sportzone_register_form]',
+        ],
+        [
             'title'   => 'Bảng size',
             'slug'    => 'bang-size',
             'content' => '<h2>Bảng size tham khảo</h2><p>Giày chạy bộ: đo chiều dài bàn chân và cộng thêm 0.5 cm. Quần áo tập luyện: chọn theo vòng ngực, eo và phong cách tập.</p>',
@@ -312,10 +552,13 @@ function sportzone_demo_create_menu(): void
 function sportzone_demo_create_products(): void
 {
     $categories = [
-        'Chạy bộ'   => 'Giày chạy bộ, áo khoác, túi nước và phụ kiện runner.',
-        'Tập luyện' => 'Đồ tập gym, dây kháng lực, găng tay và phụ kiện tập luyện.',
-        'Bóng đá'   => 'Bóng đá, giày sân cỏ, tất và bảo vệ ống đồng.',
-        'Tennis'    => 'Vợt tennis, bóng tennis, túi vợt và băng cổ tay.',
+        'Quần áo thể thao' => 'Áo tập, áo polo, đồ bóng đá, đồ bóng chuyền và trang phục vận động.',
+        'Giày thể thao'    => 'Giày thể thao nam, nữ và các mẫu giày tập luyện hằng ngày.',
+        'Dụng cụ thể thao' => 'Dụng cụ tập luyện, thiết bị hỗ trợ và sản phẩm thể thao tại nhà.',
+        'Phụ kiện thể thao' => 'Phụ kiện tập luyện, bảo hộ, túi và các món đi kèm.',
+        'Nam'              => 'Sản phẩm thể thao dành cho nam.',
+        'Nữ'               => 'Sản phẩm thể thao dành cho nữ.',
+        'Bão deal'         => 'Sản phẩm ưu đãi nổi bật.',
     ];
 
     foreach ($categories as $name => $description) {
@@ -328,14 +571,80 @@ function sportzone_demo_create_products(): void
     }
 
     $products = [
-        ['Giày chạy bộ Velocity Pro', 'Chạy bộ', 1890000, 'Giày chạy bộ đệm êm, đế cao su bám đường, phù hợp tập daily run và race 10K.', true, 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=80'],
-        ['Áo khoác gió Runner Shield', 'Chạy bộ', 790000, 'Áo khoác nhẹ chống gió, có túi khóa kéo, dùng cho buổi chạy sáng và tối.', false, 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1000&q=80'],
-        ['Áo tập gym DryFit Elite', 'Tập luyện', 490000, 'Áo tập thoáng khí, nhanh khô, form gọn cho tập gym và HIIT.', true, 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=80'],
-        ['Dây kháng lực Power Band', 'Tập luyện', 220000, 'Dây kháng lực đa năng cho khởi động, phục hồi và tập sức mạnh.', false, 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1000&q=80'],
-        ['Bóng đá sân cỏ FIFA Quality', 'Bóng đá', 650000, 'Bóng đá size 5, độ nảy tốt, phù hợp tập luyện và thi đấu phong trào.', true, 'https://images.unsplash.com/photo-1614632537423-1e6c2e7e0aab?auto=format&fit=crop&w=1000&q=80'],
-        ['Giày đá bóng Turf Control', 'Bóng đá', 1290000, 'Giày sân cỏ nhân tạo, upper bền, đế TF bám sân tốt.', false, 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=1000&q=80'],
-        ['Vợt tennis Carbon Strike', 'Tennis', 2250000, 'Vợt tennis khung carbon, cân bằng tốt cho người chơi trung cấp.', true, 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=1000&q=80'],
-        ['Túi đựng vợt Court Pack', 'Tennis', 890000, 'Túi đựng 2 vợt, ngăn riêng cho giày và phụ kiện cá nhân.', false, 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=1000&q=80'],
+        ['Giày thể thao Wano 228', 'Giày thể thao', 1180000, 'Giày thể thao nam kiểu dáng năng động, phù hợp đi chơi và tập luyện hằng ngày.', true, 'bao-deal/giaythethaonamwano228.jpg'],
+        ['Giày thể thao nữ Wanni 2230', 'Giày thể thao', 1250000, 'Giày thể thao nữ nhẹ chân, phối màu dễ mặc cho nhiều hoạt động.', true, 'bao-deal/giaythethaonuwanni2230.jpg'],
+        ['Giày thể thao nữ Wanno 231', 'Giày thể thao', 1190000, 'Giày thể thao nữ form gọn, đế êm và bám tốt.', false, 'bao-deal/giaythethaonuwanno231.jpg'],
+        ['Giày thể thao nữ Wano 221', 'Giày thể thao', 1090000, 'Mẫu giày thể thao nữ cơ bản cho đi bộ, tập nhẹ và sử dụng hằng ngày.', false, 'bao-deal/giaythethaonuwano221.jpg'],
+        ['Áo thể thao nam Wanno', 'Quần áo thể thao', 390000, 'Áo thể thao nam chất liệu thoáng, dễ phối với quần tập.', true, 'bao-deal/aothethaonamwanno.jpg'],
+        ['Giày chạy bộ Velocity Pro', 'Giày thể thao', 1890000, 'Giày chạy bộ đệm êm, đế cao su bám đường, phù hợp tập daily run và race 10K.', true, 'giay-thethao/giaythethao1.jpg'],
+        ['Áo khoác gió Runner Shield', 'Quần áo thể thao', 790000, 'Áo khoác nhẹ chống gió, có túi khóa kéo, dùng cho buổi chạy sáng và tối.', false, 'quanao-thethao/aococtaynma.jpg'],
+        ['Áo tập gym DryFit Elite', 'Quần áo thể thao', 490000, 'Áo tập thoáng khí, nhanh khô, form gọn cho tập gym và HIIT.', true, 'quanao-thethao/aotapyoganudaitay.jpg'],
+        ['Dây kháng lực Power Band', 'Dụng cụ thể thao', 220000, 'Dây kháng lực đa năng cho khởi động, phục hồi và tập sức mạnh.', false, 'dungcu-thethao/dungcu1.jpg'],
+        ['Bóng đá sân cỏ FIFA Quality', 'Dụng cụ thể thao', 650000, 'Bóng đá size 5, độ nảy tốt, phù hợp tập luyện và thi đấu phong trào.', true, 'dungcu-thethao/dungcu5.jpg'],
+        ['Giày đá bóng Turf Control', 'Giày thể thao', 1290000, 'Giày sân cỏ nhân tạo, upper bền, đế TF bám sân tốt.', false, 'giay-thethao/giaythethao7.jpg'],
+        ['Vợt tennis Carbon Strike', 'Dụng cụ thể thao', 2250000, 'Vợt tennis khung carbon, cân bằng tốt cho người chơi trung cấp.', true, 'dungcu-thethao/dungcu8.jpg'],
+        ['Túi đựng vợt Court Pack', 'Phụ kiện thể thao', 890000, 'Túi đựng 2 vợt, ngăn riêng cho giày và phụ kiện cá nhân.', false, 'phukien-thethao/phukien6.jpg'],
+        ['Dụng cụ thể thao 01', 'Dụng cụ thể thao', 250000, 'Dụng cụ hỗ trợ luyện tập tại nhà và phòng gym.', true, 'dungcu-thethao/dungcu1.jpg'],
+        ['Dụng cụ thể thao 02', 'Dụng cụ thể thao', 320000, 'Thiết bị tập luyện đa năng cho người mới bắt đầu.', true, 'dungcu-thethao/dungcu2.jpg'],
+        ['Dụng cụ thể thao 03', 'Dụng cụ thể thao', 280000, 'Dụng cụ tập gọn nhẹ, dễ cất giữ và sử dụng.', false, 'dungcu-thethao/dungcu3.jpg'],
+        ['Dụng cụ thể thao 04', 'Dụng cụ thể thao', 350000, 'Sản phẩm hỗ trợ tăng cường vận động hằng ngày.', false, 'dungcu-thethao/dungcu4.jpg'],
+        ['Dụng cụ thể thao 05', 'Dụng cụ thể thao', 420000, 'Dụng cụ tập luyện bền bỉ cho nhiều bài tập.', false, 'dungcu-thethao/dungcu5.jpg'],
+        ['Dụng cụ thể thao 06', 'Dụng cụ thể thao', 390000, 'Thiết kế chắc chắn, phù hợp tập luyện cá nhân.', false, 'dungcu-thethao/dungcu6.jpg'],
+        ['Dụng cụ thể thao 07', 'Dụng cụ thể thao', 220000, 'Dụng cụ nhỏ gọn cho bài tập bổ trợ.', false, 'dungcu-thethao/dungcu7.jpg'],
+        ['Dụng cụ thể thao 08', 'Dụng cụ thể thao', 460000, 'Dụng cụ tập luyện cho gia đình và phòng tập.', false, 'dungcu-thethao/dungcu8.jpg'],
+        ['Dụng cụ thể thao 09', 'Dụng cụ thể thao', 180000, 'Phụ trợ luyện tập cơ bản, dễ sử dụng.', false, 'dungcu-thethao/dungcu9.jpg'],
+        ['Dụng cụ thể thao 10', 'Dụng cụ thể thao', 510000, 'Sản phẩm hỗ trợ bài tập cường độ vừa và cao.', false, 'dungcu-thethao/dungcu10.jpg'],
+        ['Giày thể thao SZ 01', 'Giày thể thao', 890000, 'Giày thể thao êm chân, dùng tốt cho đi bộ và vận động nhẹ.', true, 'giay-thethao/giaythethao1.jpg'],
+        ['Giày thể thao SZ 02', 'Giày thể thao', 940000, 'Mẫu giày thể thao linh hoạt cho lịch tập hằng tuần.', false, 'giay-thethao/giaythethao2.jpg'],
+        ['Giày thể thao SZ 03', 'Giày thể thao', 790000, 'Giày thể thao thiết kế trẻ trung, dễ phối đồ.', false, 'giay-thethao/giaythethao3.jpg'],
+        ['Giày thể thao SZ 04', 'Giày thể thao', 860000, 'Đế bám ổn định, phù hợp nhiều bề mặt.', false, 'giay-thethao/giaythethao4.jpg'],
+        ['Giày thể thao SZ 05', 'Giày thể thao', 990000, 'Form ôm chân, chất liệu thoáng khí.', false, 'giay-thethao/giaythethao5.jpg'],
+        ['Giày thể thao SZ 06', 'Giày thể thao', 760000, 'Lựa chọn gọn nhẹ cho đi học, đi làm và tập luyện.', false, 'giay-thethao/giaythethao6.jpg'],
+        ['Giày thể thao SZ 07', 'Giày thể thao', 1120000, 'Giày thể thao phong cách năng động, đế êm.', false, 'giay-thethao/giaythethao7.jpg'],
+        ['Giày thể thao SZ 08', 'Giày thể thao', 820000, 'Mẫu giày cơ bản, dễ dùng trong nhiều hoạt động.', false, 'giay-thethao/giaythethao8.jpg'],
+        ['Giày thể thao SZ 09', 'Giày thể thao', 1290000, 'Giày thể thao nổi bật với chất liệu bền và đệm tốt.', true, 'giay-thethao/giaythethao9.jpg'],
+        ['Giày thể thao SZ 10', 'Giày thể thao', 970000, 'Giày tập luyện đa dụng cho nam và nữ.', false, 'giay-thethao/giaythethao10.jpg'],
+        ['Đồ thể thao nam 01', 'Nam', 520000, 'Trang phục thể thao nam thoáng mát, dễ vận động.', true, 'Nam/donam1.jpg'],
+        ['Đồ thể thao nam 02', 'Nam', 470000, 'Sản phẩm nam phù hợp tập luyện hằng ngày.', false, 'Nam/donam2.jpg'],
+        ['Đồ thể thao nam 03', 'Nam', 490000, 'Thiết kế nam tính, chất liệu dễ chịu.', false, 'Nam/donam3.jpg'],
+        ['Đồ thể thao nam 04', 'Nam', 590000, 'Bộ đồ thể thao nam cho tập luyện và dạo phố.', false, 'Nam/donam4.jpg'],
+        ['Đồ thể thao nam 05', 'Nam', 430000, 'Form mặc thoải mái, dễ phối phụ kiện.', false, 'Nam/donam5.jpg'],
+        ['Đồ thể thao nam 06', 'Nam', 450000, 'Chất liệu nhẹ, phù hợp khí hậu nóng.', false, 'Nam/donam6.jpg'],
+        ['Đồ thể thao nam 07', 'Nam', 510000, 'Trang phục thể thao nam năng động.', false, 'Nam/donam7.jpg'],
+        ['Đồ thể thao nam 08', 'Nam', 530000, 'Sản phẩm thể thao nam bền đẹp.', false, 'Nam/donam8.jpg'],
+        ['Đồ thể thao nam 09', 'Nam', 390000, 'Lựa chọn cơ bản cho vận động hằng ngày.', false, 'Nam/donam9.jpg'],
+        ['Đồ thể thao nam 10', 'Nam', 410000, 'Trang phục nam gọn nhẹ, dễ giặt nhanh khô.', false, 'Nam/donam10.jpg'],
+        ['Đồ thể thao nữ 01', 'Nữ', 420000, 'Trang phục thể thao nữ nhẹ, co giãn và thoải mái.', true, 'Nu/donu1.jpg'],
+        ['Đồ thể thao nữ 02', 'Nữ', 450000, 'Sản phẩm nữ phù hợp yoga, gym và đi bộ.', false, 'Nu/donu2.jpg'],
+        ['Đồ thể thao nữ 03', 'Nữ', 460000, 'Thiết kế gọn gàng, dễ phối nhiều lớp.', false, 'Nu/donu3.jpg'],
+        ['Đồ thể thao nữ 04', 'Nữ', 390000, 'Trang phục thể thao nữ cho hoạt động hằng ngày.', false, 'Nu/donu4.jpg'],
+        ['Đồ thể thao nữ 05', 'Nữ', 560000, 'Mẫu đồ nữ nổi bật, chất liệu thoáng.', false, 'Nu/donu5.jpg'],
+        ['Đồ thể thao nữ 06', 'Nữ', 480000, 'Form vận động linh hoạt cho nhiều bài tập.', false, 'Nu/donu6.jpg'],
+        ['Đồ thể thao nữ 07', 'Nữ', 500000, 'Sản phẩm nữ trẻ trung, dễ mặc.', false, 'Nu/donu7.jpg'],
+        ['Đồ thể thao nữ 08', 'Nữ', 620000, 'Trang phục nữ chất liệu bền và êm da.', false, 'Nu/donu8.jpg'],
+        ['Đồ thể thao nữ 09', 'Nữ', 350000, 'Lựa chọn tiết kiệm cho tập luyện nhẹ.', false, 'Nu/donu9.jpg'],
+        ['Đồ thể thao nữ 10', 'Nữ', 530000, 'Trang phục nữ gọn nhẹ, thoải mái khi vận động.', false, 'Nu/donu10.jpg'],
+        ['Phụ kiện thể thao 01', 'Phụ kiện thể thao', 190000, 'Phụ kiện hỗ trợ tập luyện và thi đấu.', true, 'phukien-thethao/phukien1.jpg'],
+        ['Phụ kiện thể thao 02', 'Phụ kiện thể thao', 230000, 'Món phụ kiện tiện dụng cho người tập thể thao.', false, 'phukien-thethao/phukien2.jpg'],
+        ['Phụ kiện thể thao 03', 'Phụ kiện thể thao', 270000, 'Phụ kiện chất lượng, dễ mang theo.', false, 'phukien-thethao/phukien3.jpg'],
+        ['Phụ kiện thể thao 04', 'Phụ kiện thể thao', 210000, 'Phụ kiện cơ bản cho luyện tập hằng ngày.', false, 'phukien-thethao/phukien4.jpg'],
+        ['Phụ kiện thể thao 05', 'Phụ kiện thể thao', 240000, 'Sản phẩm phụ kiện bền và gọn.', false, 'phukien-thethao/phukien5.jpg'],
+        ['Phụ kiện thể thao 06', 'Phụ kiện thể thao', 290000, 'Phụ kiện thể thao đa năng.', false, 'phukien-thethao/phukien6.jpg'],
+        ['Phụ kiện thể thao 07', 'Phụ kiện thể thao', 260000, 'Thiết kế nhỏ gọn, phù hợp mang theo khi tập.', false, 'phukien-thethao/phukien7.jpg'],
+        ['Phụ kiện thể thao 08', 'Phụ kiện thể thao', 180000, 'Phụ kiện giá tốt cho người mới bắt đầu.', false, 'phukien-thethao/phukien8.jpg'],
+        ['Phụ kiện thể thao 09', 'Phụ kiện thể thao', 310000, 'Phụ kiện nổi bật cho tập luyện ngoài trời.', false, 'phukien-thethao/phukien9.jpg'],
+        ['Phụ kiện thể thao 10', 'Phụ kiện thể thao', 220000, 'Phụ kiện tiện lợi cho nhiều môn thể thao.', false, 'phukien-thethao/phukien10.jpg'],
+        ['Áo cộc tay thể thao nam', 'Quần áo thể thao', 360000, 'Áo cộc tay thể thao nam thoáng mát, phù hợp tập luyện.', true, 'quanao-thethao/aococtaynma.jpg'],
+        ['Áo polo thể thao nam', 'Quần áo thể thao', 420000, 'Áo polo thể thao nam lịch sự, dễ mặc hằng ngày.', false, 'quanao-thethao/aopolotethaonam.jpg'],
+        ['Áo polo thể thao Riki', 'Quần áo thể thao', 450000, 'Áo polo thể thao chất liệu thoáng và bền màu.', false, 'quanao-thethao/aopolothethaoriki.jpg'],
+        ['Áo tập yoga nữ dài tay', 'Quần áo thể thao', 390000, 'Áo tập yoga nữ dài tay, co giãn tốt.', false, 'quanao-thethao/aotapyoganudaitay.jpg'],
+        ['Áo thể thao bra nữ', 'Quần áo thể thao', 320000, 'Áo bra thể thao nữ hỗ trợ vận động ổn định.', false, 'quanao-thethao/aothethaobranu.jpg'],
+        ['Quần áo bóng chuyền nam', 'Quần áo thể thao', 520000, 'Bộ quần áo bóng chuyền nam thoáng khí.', false, 'quanao-thethao/quanaobongchuyennam.jpg'],
+        ['Quần áo bóng chuyền nữ Beyini Heronii', 'Quần áo thể thao', 540000, 'Bộ đồ bóng chuyền nữ nổi bật, dễ vận động.', false, 'quanao-thethao/quanaobongchuyennubeyiniheronii.jpg'],
+        ['Quần áo bóng đá Beyyono Rage', 'Quần áo thể thao', 560000, 'Bộ quần áo bóng đá chất liệu nhanh khô.', false, 'quanao-thethao/quanaobongdabeyyonorage.jpg'],
+        ['Quần áo bóng đá Just Play Raine', 'Quần áo thể thao', 530000, 'Bộ đồ bóng đá form thể thao năng động.', false, 'quanao-thethao/quanaobongdajustplayraine.jpg'],
+        ['Quần áo bóng đá Riki Star Sweep', 'Quần áo thể thao', 580000, 'Bộ quần áo bóng đá Riki cho tập luyện và thi đấu.', false, 'quanao-thethao/quanaobongdarikistarsweep.jpg'],
+        ['Quần đùi chạy bộ siêu nhẹ', 'Quần áo thể thao', 280000, 'Quần đùi chạy bộ nhẹ, thoáng và nhanh khô.', false, 'quanao-thethao/quanduichaybosieunhe.jpg'],
     ];
 
     foreach ($products as $product_data) {
@@ -348,6 +657,17 @@ function sportzone_demo_create_products(): void
         }
 
         if ($existing_product) {
+            $product = wc_get_product((int) $existing_product->ID);
+
+            if ($product instanceof WC_Product) {
+                $product->set_description($description);
+                $product->set_short_description($description);
+                $product->set_regular_price((string) $price);
+                $product->set_featured($featured);
+                $product->save();
+            }
+
+            wp_set_object_terms((int) $existing_product->ID, $category, 'product_cat');
             sportzone_demo_set_product_image((int) $existing_product->ID, $image_url, $name, $category);
             continue;
         }
@@ -375,7 +695,10 @@ function sportzone_demo_create_products(): void
 
 function sportzone_demo_set_product_image(int $product_id, string $image_url, string $name, string $category = ''): void
 {
-    if (has_post_thumbnail($product_id) && !sportzone_demo_has_generated_thumbnail($product_id)) {
+    $image_path = $image_url;
+    $image_url = sportzone_demo_image_url($image_url);
+
+    if (has_post_thumbnail($product_id) && !sportzone_demo_has_generated_thumbnail($product_id) && sportzone_demo_thumbnail_source($product_id) === $image_url) {
         return;
     }
 
@@ -383,7 +706,19 @@ function sportzone_demo_set_product_image(int $product_id, string $image_url, st
     require_once ABSPATH . 'wp-admin/includes/media.php';
     require_once ABSPATH . 'wp-admin/includes/image.php';
 
-    $attachment_id = media_sideload_image($image_url, $product_id, $name, 'id');
+    $attachment_id = sportzone_demo_find_image_attachment($image_url);
+
+    if (!$attachment_id) {
+        $attachment_id = sportzone_demo_create_local_image_attachment($image_path, $image_url, $name, $product_id);
+    }
+
+    if (!$attachment_id) {
+        $attachment_id = media_sideload_image($image_url, $product_id, $name, 'id');
+
+        if (!is_wp_error($attachment_id) && $attachment_id) {
+            update_post_meta((int) $attachment_id, '_sportzone_source_image', $image_url);
+        }
+    }
 
     if (is_wp_error($attachment_id)) {
         $attachment_id = sportzone_demo_create_product_placeholder($product_id, $name, $category);
@@ -391,7 +726,73 @@ function sportzone_demo_set_product_image(int $product_id, string $image_url, st
 
     if (!is_wp_error($attachment_id) && $attachment_id) {
         set_post_thumbnail($product_id, (int) $attachment_id);
+        update_post_meta($product_id, '_thumbnail_id', (int) $attachment_id);
     }
+}
+
+function sportzone_demo_image_url(string $path): string
+{
+    if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+        return $path;
+    }
+
+    return content_url('images/' . ltrim($path, '/'));
+}
+
+function sportzone_demo_create_local_image_attachment(string $path, string $image_url, string $name, int $product_id): int
+{
+    if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+        return 0;
+    }
+
+    $relative_path = ltrim(str_replace('\\', '/', $path), '/');
+    $file_path = wp_normalize_path(WP_CONTENT_DIR . '/images/' . $relative_path);
+
+    if (!file_exists($file_path)) {
+        return 0;
+    }
+
+    $filetype = wp_check_filetype(basename($file_path));
+    $attachment_id = wp_insert_attachment([
+        'guid'           => $image_url,
+        'post_mime_type' => $filetype['type'] ?: 'image/jpeg',
+        'post_title'     => $name,
+        'post_content'   => '',
+        'post_status'    => 'inherit',
+    ], '', $product_id);
+
+    if (is_wp_error($attachment_id) || !$attachment_id) {
+        return 0;
+    }
+
+    update_post_meta((int) $attachment_id, '_sportzone_source_image', $image_url);
+
+    return (int) $attachment_id;
+}
+
+function sportzone_demo_find_image_attachment(string $image_url): int
+{
+    $attachments = get_posts([
+        'post_type'      => 'attachment',
+        'post_status'    => 'inherit',
+        'posts_per_page' => 1,
+        'fields'         => 'ids',
+        'meta_key'       => '_sportzone_source_image',
+        'meta_value'     => $image_url,
+    ]);
+
+    return $attachments ? (int) $attachments[0] : 0;
+}
+
+function sportzone_demo_thumbnail_source(int $product_id): string
+{
+    $thumbnail_id = get_post_thumbnail_id($product_id);
+
+    if (!$thumbnail_id) {
+        return '';
+    }
+
+    return (string) get_post_meta($thumbnail_id, '_sportzone_source_image', true);
 }
 
 function sportzone_demo_has_generated_thumbnail(int $product_id): bool

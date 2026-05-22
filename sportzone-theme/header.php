@@ -11,7 +11,9 @@ if (!defined('ABSPATH')) {
 
 $shop_url = class_exists('WooCommerce') ? wc_get_page_permalink('shop') : home_url('/?post_type=product');
 $cart_url = class_exists('WooCommerce') ? wc_get_cart_url() : home_url('/cart');
-$account_url = class_exists('WooCommerce') ? wc_get_page_permalink('myaccount') : home_url('/my-account');
+$account_url = is_user_logged_in()
+    ? (class_exists('WooCommerce') ? wc_get_page_permalink('myaccount') : home_url('/my-account'))
+    : home_url('/dang-nhap');
 ?><!doctype html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -113,7 +115,7 @@ $account_url = class_exists('WooCommerce') ? wc_get_page_permalink('myaccount') 
 
                 <a class="market-cart" href="<?php echo esc_url($cart_url); ?>">
                     <span class="dashicons dashicons-cart" aria-hidden="true"></span>
-                    <strong><?php echo esc_html(sportzone_cart_count()); ?></strong>
+                    <strong class="sportzone-cart-count"><?php echo esc_html(sportzone_cart_count()); ?></strong>
                     <span><?php esc_html_e('Giỏ hàng', 'sportzone'); ?></span>
                 </a>
             </div>

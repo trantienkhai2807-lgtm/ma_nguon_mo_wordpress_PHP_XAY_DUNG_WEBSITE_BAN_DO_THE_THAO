@@ -549,7 +549,7 @@ img {
   inset: 0;
   background:
     linear-gradient(90deg, rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.45), rgba(17, 24, 39, 0.08)),
-    url("https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1800&q=82") center/cover;
+    url("../../images/Banner/slider_1.jpg") center/cover;
 }
 
 .hero__content {
@@ -706,6 +706,7 @@ img {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 100%;
   width: auto !important;
   float: none !important;
   clear: none !important;
@@ -754,15 +755,17 @@ img {
 
 .woocommerce ul.products li.product .woocommerce-loop-product__link,
 .woocommerce-page ul.products li.product .woocommerce-loop-product__link {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   color: var(--sz-ink);
 }
 
 .woocommerce ul.products li.product .woocommerce-loop-product__title,
 .woocommerce-page ul.products li.product .woocommerce-loop-product__title {
-  min-height: 76px;
+  min-height: 66px;
   margin: 0;
-  padding: 8px 18px 6px;
+  padding: 10px 18px 6px;
   color: var(--sz-ink);
   font-size: 1.02rem;
   line-height: 1.35;
@@ -780,10 +783,12 @@ img {
 
 .product-card__badge {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: max-content;
   max-width: calc(100% - 36px);
   margin: 16px 18px 0;
-  padding: 5px 8px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: #eaf7f5;
   color: var(--sz-teal);
@@ -805,21 +810,51 @@ img {
 .woocommerce ul.products li.product .price,
 .woocommerce-page ul.products li.product .price {
   display: block;
-  margin: 0 18px 14px;
+  margin: 4px 18px 18px;
   color: var(--sz-action);
   font-weight: 900;
-  font-size: 1.08rem;
+  font-size: 1.22rem;
+  line-height: 1.15;
 }
 
 .woocommerce ul.products li.product .button,
 .woocommerce-page ul.products li.product .button {
-  align-self: flex-start;
+  align-self: stretch;
   width: calc(100% - 36px);
-  min-height: 46px;
-  margin: auto 18px 18px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto 18px 12px;
+  border-radius: 7px;
+  background: #e12b20;
+  color: #fff;
+  box-shadow: 0 10px 18px rgba(217, 41, 28, 0.18);
   white-space: normal;
   text-align: center;
   line-height: 1.2;
+}
+
+.woocommerce ul.products li.product .button:hover,
+.woocommerce-page ul.products li.product .button:hover {
+  background: var(--sz-action-dark);
+  transform: translateY(-1px);
+}
+
+.woocommerce ul.products li.product .button.added,
+.woocommerce-page ul.products li.product .button.added {
+  margin-bottom: 18px;
+}
+
+.woocommerce ul.products li.product .button.added::after,
+.woocommerce-page ul.products li.product .button.added::after {
+  margin-left: 8px;
+  vertical-align: baseline;
+}
+
+.woocommerce ul.products li.product a.added_to_cart,
+.woocommerce-page ul.products li.product a.added_to_cart {
+  display: none !important;
 }
 
 .feature-band {
@@ -922,7 +957,7 @@ img {
 .shop-hero {
   background:
     linear-gradient(90deg, rgba(17, 24, 39, 0.94), rgba(17, 24, 39, 0.72)),
-    url("https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1800&q=82") center/cover;
+    url("../../images/Banner/section_gbanner_1.jpg") center/cover;
   color: #fff;
   padding: 54px 0;
 }
@@ -1124,6 +1159,28 @@ img {
   font-weight: 800;
 }
 
+.sportzone-checkout-saved-card {
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid #b9e3d8;
+  border-radius: 6px;
+  background: #eaf7f5;
+  color: var(--sz-ink);
+}
+
+.sportzone-checkout-saved-card label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+}
+
+.sportzone-checkout-saved-card input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+}
+
 .woocommerce-message,
 .woocommerce-info,
 .woocommerce-error {
@@ -1200,6 +1257,69 @@ img {
   font-weight: 900;
 }
 
+.sportzone-auth {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.sportzone-auth__form {
+  display: grid;
+  gap: 16px;
+}
+
+.sportzone-auth__form p {
+  margin: 0;
+}
+
+.sportzone-auth__form label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--sz-ink);
+  font-weight: 800;
+}
+
+.sportzone-auth__form input[type="text"],
+.sportzone-auth__form input[type="email"],
+.sportzone-auth__form input[type="password"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--sz-line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--sz-ink);
+  font: inherit;
+}
+
+.sportzone-auth__check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--sz-muted);
+  font-weight: 750;
+}
+
+.sportzone-auth__check input {
+  width: 17px;
+  height: 17px;
+}
+
+.sportzone-auth__form .button {
+  width: 100%;
+  min-height: 48px;
+}
+
+.sportzone-auth__switch {
+  margin: 18px 0 0;
+  color: var(--sz-muted);
+  text-align: center;
+}
+
+.sportzone-auth__switch a {
+  color: var(--sz-action);
+  font-weight: 900;
+}
+
 .woocommerce form .form-row label {
   color: var(--sz-ink);
   font-weight: 800;
@@ -1218,8 +1338,12 @@ img {
 }
 
 .woocommerce-account .woocommerce-MyAccount-navigation {
-  width: 260px;
-  padding: 10px;
+  width: 290px;
+  padding: 14px;
+  border: 0;
+  background: #111827;
+  color: #fff;
+  box-shadow: var(--sz-shadow);
 }
 
 .woocommerce-account .woocommerce-MyAccount-navigation ul {
@@ -1231,22 +1355,199 @@ img {
 .woocommerce-account .woocommerce-MyAccount-navigation a {
   display: flex;
   align-items: center;
-  min-height: 42px;
-  padding: 0 12px;
+  min-height: 48px;
+  padding: 0 14px;
   border-radius: 6px;
-  color: var(--sz-muted);
+  color: rgba(255, 255, 255, 0.78);
   font-weight: 800;
 }
 
 .woocommerce-account .woocommerce-MyAccount-navigation .is-active a,
 .woocommerce-account .woocommerce-MyAccount-navigation a:hover {
-  background: #eef1f5;
-  color: var(--sz-ink);
+  background: #f45a00;
+  color: #fff;
 }
 
 .woocommerce-account .woocommerce-MyAccount-content {
-  width: calc(100% - 290px);
-  padding: 26px;
+  width: calc(100% - 320px);
+  min-height: 274px;
+  padding: 32px;
+  border: 0;
+  background: #fff;
+  box-shadow: var(--sz-shadow);
+}
+
+.woocommerce-account .woocommerce-MyAccount-content > p:first-child {
+  display: none;
+}
+
+.woocommerce-account .woocommerce-MyAccount-content > p:first-child + p {
+  display: none;
+}
+
+.woocommerce-account .woocommerce-MyAccount-content a {
+  color: var(--sz-action);
+  font-weight: 800;
+}
+
+.woocommerce-account .woocommerce-MyAccount-content fieldset {
+  margin: 24px 0 0;
+  padding: 22px;
+  border: 1px solid var(--sz-line);
+  border-radius: var(--sz-radius);
+}
+
+.woocommerce-account .woocommerce-MyAccount-content legend {
+  padding: 0 8px;
+  font-weight: 900;
+}
+
+.woocommerce-account .woocommerce-Address {
+  border: 1px solid var(--sz-line);
+  border-radius: var(--sz-radius);
+  padding: 22px;
+  background: #f8fafc;
+}
+
+.woocommerce-account .woocommerce-Address-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.woocommerce-account .woocommerce-Address-title h2 {
+  margin: 0;
+}
+
+.sportzone-account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.sportzone-account-grid a {
+  display: grid;
+  gap: 8px;
+  min-height: 142px;
+  padding: 20px;
+  border: 1px solid var(--sz-line);
+  border-radius: var(--sz-radius);
+  background: #f8fafc;
+  color: var(--sz-ink);
+}
+
+.sportzone-account-grid a:hover {
+  border-color: #f45a00;
+  background: #fff7ed;
+}
+
+.sportzone-account-grid .dashicons {
+  width: 32px;
+  height: 32px;
+  color: #f45a00;
+  font-size: 32px;
+  line-height: 32px;
+}
+
+.sportzone-account-grid strong {
+  font-size: 1.08rem;
+}
+
+.sportzone-account-grid small {
+  color: var(--sz-muted);
+  font-weight: 700;
+}
+
+.sportzone-account-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.sportzone-account-panel__head span {
+  color: var(--sz-action);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sportzone-account-panel__head h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+}
+
+.sportzone-account-panel__head strong {
+  display: inline-grid;
+  min-height: 30px;
+  place-items: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eaf7f5;
+  color: var(--sz-teal);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.sportzone-saved-card {
+  margin-bottom: 22px;
+  padding: 24px;
+  border-radius: var(--sz-radius);
+  background: linear-gradient(135deg, #111827, #5b1d00);
+  color: #fff;
+}
+
+.sportzone-saved-card span,
+.sportzone-saved-card small {
+  display: block;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 800;
+}
+
+.sportzone-saved-card strong {
+  display: block;
+  margin: 22px 0 12px;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  letter-spacing: 0;
+}
+
+.sportzone-card-form {
+  display: grid;
+  gap: 16px;
+}
+
+.sportzone-card-form p {
+  margin: 0;
+}
+
+.sportzone-card-form label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 900;
+}
+
+.sportzone-card-form input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--sz-line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--sz-ink);
+  font: inherit;
+}
+
+.sportzone-card-form__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sportzone-card-form .button {
+  justify-self: start;
 }
 
 .woocommerce-cart-form {
@@ -1291,12 +1592,15 @@ img {
 
 .woocommerce-checkout form.checkout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+  grid-template-rows: auto 1fr;
   gap: 28px;
   align-items: start;
 }
 
 .woocommerce-checkout .col2-set {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   width: 100%;
   padding: 26px;
 }
@@ -1309,11 +1613,13 @@ img {
 
 .woocommerce-checkout #order_review_heading {
   grid-column: 2;
+  grid-row: 1;
   margin: 0;
 }
 
 .woocommerce-checkout #order_review {
   grid-column: 2;
+  grid-row: 2;
   padding: 24px;
 }
 
@@ -1443,11 +1749,18 @@ img {
 
   .woocommerce-checkout form.checkout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .woocommerce-checkout .col2-set {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .woocommerce-checkout #order_review_heading,
   .woocommerce-checkout #order_review {
     grid-column: auto;
+    grid-row: auto;
   }
 
   .woocommerce-account .woocommerce-MyAccount-navigation,
@@ -1458,6 +1771,10 @@ img {
 
   .woocommerce-account .woocommerce-MyAccount-navigation {
     margin-bottom: 18px;
+  }
+
+  .sportzone-account-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1558,6 +1875,14 @@ img {
   .woocommerce-page ul.products,
   .feature-list,
   .footer__inner {
+    grid-template-columns: 1fr;
+  }
+
+  .woocommerce-account .woocommerce-MyAccount-content {
+    padding: 22px;
+  }
+
+  .sportzone-card-form__row {
     grid-template-columns: 1fr;
   }
 }
