@@ -1,0 +1,22 @@
+# WordPress core / local install
+wordpress/
+wp-admin/
+wp-includes/
+wp-content/uploads/
+wp-content/cache/
+wp-config.php
+
+# Database exports
+*.sql
+*.sqlite
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs/cache
+*.log
+node_modules/
+vendor/
